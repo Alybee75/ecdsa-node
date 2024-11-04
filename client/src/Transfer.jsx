@@ -1,7 +1,8 @@
 import { useState } from "react";
 import server from "./server";
+import { signMessage } from "../scripts/generate.js"; // Make sure to use import
 
-function Transfer({ address, setBalance }) {
+function Transfer({ priv, address, setBalance }) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
 
@@ -11,14 +12,33 @@ function Transfer({ address, setBalance }) {
     evt.preventDefault();
 
     try {
-      const {
-        data: { balance },
-      } = await server.post(`send`, {
-        sender: address,
-        amount: parseInt(sendAmount),
-        recipient,
+      signMessage(sendAmount, priv)
+      .then((signature) => {
+
+        const sign = {
+          r: signature.r.toString(),
+          s: signature.s.toString(),
+          recovery: signature.recovery,
+        };
+
+        return server.post(`send`, {
+          sign: sign,
+          address: address,
+          amount: parseInt(sendAmount),
+          recipient,
+        });
+      })
+      .then((response) => {
+        const { balance } = response.data;
+        setBalance(balance);
+      })
+      .catch((ex) => {
+        if (ex.response) {
+          alert(ex.response.data.message);
+        } else {
+          alert("An error occurred: " + ex.message);
+        }
       });
-      setBalance(balance);
     } catch (ex) {
       alert(ex.response.data.message);
     }
